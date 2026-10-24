@@ -139,7 +139,9 @@ loader = "firmware"
 title = "Boot"
 # The DarwinBoot handoff window used by the giulia port. Not the installed 12 GB.
 dram_size = "0x10000000"
-panic_screen = true
+# The entry-probe patch carries offsets specific to one kernel layout; the ruyi kernel
+# does not match them yet, so the panic screen is off for the first boots (like giulia).
+panic_screen = false
 timeout = 3
 kernel_args = [
   "-v",
