@@ -69,10 +69,12 @@ roots = [
   "com.apple.driver.AppleEffaceableStorage",
   "com.apple.driver.AppleIISController",
   "com.apple.driver.AppleM2ScalerCSCDriver",
-  # AMFI start panics with "AMFI: No PMGR?\n" (ConfigurationSettings.cpp:235) because the platform
-  # publishes no ApplePMGRNub service; that nub needs the sheng original-PMGR ABI, whose snapshots
-  # are unavailable (ArnoDorian123/UniXNU-sheng is gone). Test whether the kernel boots without it.
-  #"com.apple.driver.AppleMobileFileIntegrity",
+  # AMFI's start panics with "AMFI: No PMGR?\n" (ConfigurationSettings.cpp:235) on this platform.
+  # The fix is not a board config knob: the prelinked kernel is patched after the build by
+  # patch-amfi-ruyi.py (ported from Axiang-dev/UniXNU-caihong), which renames AMFI's own lookup
+  # string, makes the PMGR read/write trampolines inert and turns the failed lookup into
+  # "return 0". AMFI therefore stays a root kext here, exactly as in the working caihong port.
+  "com.apple.driver.AppleMobileFileIntegrity",
   "com.apple.driver.ApplePMGR",
   "com.apple.driver.IODARTFamily",
   "com.apple.filesystems.apfs",
