@@ -134,7 +134,7 @@ BUILDID_STRING = "ruyi-research"
 
 [payload]
 volume = "RUYIESP"
-size_mib = 192
+size_mib = 64   # kernel.macho is 51.8 MB; a 192 MiB volume made a 194 MB boot image
 loader = "firmware"
 title = "Boot"
 # The DarwinBoot handoff window used by the giulia port. Not the installed 12 GB.
