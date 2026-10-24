@@ -55,7 +55,12 @@ tool = "kits/NativePrelink/emit_prelink.py"
 kernel = "build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/mach.development.bcm2837.unstripped.noctf"
 kernelcache_sha256 = "f18b4df865405f2a287b84977d7aca745e056d656d9fc9df1662970ce2969de7"
 slide = "-0x1000000"
-early_security_init = "com.apple.driver.AppleMobileFileIntegrity=0xfffffff005ab4ae0"
+# AMFI's early security initializer panics with "AMFI: No PMGR?\n" (ConfigurationSettings.cpp:235)
+# because no IOKit service named ApplePMGRNub exists on this platform (that nub needs the sheng
+# original-PMGR ABI, whose snapshot files are not available: ArnoDorian123/UniXNU-sheng is gone).
+# Leaving the initializer out defers AMFI to normal kext loading so the rest of bsd_init can run;
+# restore this line once a PMGR nub provider is built.
+#early_security_init = "com.apple.driver.AppleMobileFileIntegrity=0xfffffff005ab4ae0"
 roots = [
   "com.apple.AppleFSCompression.AppleFSCompressionTypeZlib",
   "com.apple.driver.AppleARMPlatform",
