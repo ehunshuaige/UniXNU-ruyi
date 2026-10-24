@@ -99,7 +99,7 @@ roots = [
 # Include/*.inc fragments hardcode shengPkg/... INF paths, so keeping the directory name keeps
 # them valid. Only the platform identity and the SoC include differ from sheng.
 config = "ruyi"
-dsc = "Platforms/Xiaomi/shengPkg/ruyi.dsc"
+dsc = "Platforms/Xiaomi/ruyiPkg/ruyi.dsc"
 fd = "Build/ruyiPkg/{target}_CLANGPDB/FV/SILICIUM_UEFI.fd"
 # No preflight script yet: a missing one aborts the firmware step. Add scripts/check-ruyi.py
 # to the device repository first if vendor inputs ever need validation.
