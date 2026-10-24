@@ -31,3 +31,12 @@ CONFIG_XNU_NATIVE_RAM_BLOCK=n
 # CONFIG_XNU_OWNER_ROOT_TRUST=y
 # CONFIG_XNU_OWNER_DATA_MOUNT=y
 # CONFIG_XNU_OWNER_DATA_VOLUME_UUID="00000000-0000-0000-0000-000000000000"
+
+# The Apple BCM2837 PLATFORM_PANIC_LOG_PADDR (0x3C0FC000) is not DRAM on this SoC, and
+# check_for_panic_log() faults on it (ml_io_map_wcomb + read). With XNU_DT_PANIC_REGION the
+# region comes from the device tree (/chosen/embedded-panic-log) and an absent node just
+# returns, so PE_create_console reaches initialize_screen() and the kernel console maps onto
+# the framebuffer DarwinBoot already set up. Same fix the giulia port records in
+# hardware/panic-console-fixed-address.json.
+CONFIG_XNU_NATIVE_PAN=y
+CONFIG_XNU_DT_PANIC_REGION=y
