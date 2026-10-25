@@ -37,8 +37,12 @@ windows = [
 [kernel]
 defconfig = "ruyi_defconfig"
 # build-arm-driver.py exists only in device repositories, not in UniXNU/scripts.
-# build-ruyi-display-stubs.py satisfies the XNU_NATIVE_LEGACY_DISPLAY=1 link contract without
-# sheng's audit data (it writes build/native-legacy-display/libNativeLegacyDisplay.late.a).
+# build-ruyi-display.py builds the real display driver: MiniIOMobileFramebuffer +
+# MiniIOSurface adapted from HackiOS (drivers/RuyiDisplay/), compiled with the kernel's
+# own compile record and written to build/native-legacy-display/libNativeLegacyDisplay.late.a,
+# which XNU_NATIVE_LEGACY_DISPLAY=1 force-loads.  native_legacy_display_late_probe() in
+# RuyiDisplayEntry.cpp publishes and starts the IOMobileFramebuffer service from
+# bsd_autoconf(), after IOKitBSDInit().
 # NativeUfs is postponed to M3: it references boot-progress, verified-root and IOStorageFamily
 # symbols that only the full sheng feature stack links.
 archives = [
@@ -46,7 +50,7 @@ archives = [
   "build-corecrypto-14.py --namespace",
   "build-arm-driver.py ArmDTPlatform",
   "build-arm-driver.py ArmCpu",
-  "build-ruyi-display-stubs.py",
+  "build-ruyi-display.py",
   "build-libpthread-kernel.py",
 ]
 
@@ -85,11 +89,9 @@ roots = [
   "com.apple.iokit.IOCryptoAcceleratorFamily",
   "com.apple.iokit.IOGPUFamily",
   "com.apple.iokit.IOHDCPFamily",
-  "com.apple.iokit.IOMobileGraphicsFamily",
   "com.apple.iokit.IOReportFamily",
   "com.apple.iokit.IOSlowAdaptiveClockingFamily",
   "com.apple.iokit.IOStorageFamily",
-  "com.apple.iokit.IOSurface",
   "com.apple.kec.Libm",
   "com.apple.kec.corecrypto",
   "com.apple.kext.AppleMatch",
