@@ -55,7 +55,13 @@ static IOService *activeLegacyDisplay;
 // Keep one diagnostic mapping alive until reboot, even after backend stop.
 // The pulse is permanently closed before any system-frame copy.
 static IOMemoryMap *diagnosticAnchorMapping;
-extern "C" int boot_progress_pulse_anchor(uintptr_t,uint64_t,unsigned,unsigned,unsigned) __attribute__((weak_import));
+// Boot progress is an optional archive on this port (sheng links one; ruyi does not).
+// Weak definitions keep the driver's optional observation hooks linkable either way;
+// a strong definition from a boot-progress archive still overrides them.
+extern "C" __attribute__((weak)) int boot_progress_pulse_anchor(uintptr_t,uint64_t,unsigned,unsigned,unsigned);
+extern "C" __attribute__((weak)) int boot_progress_pulse_anchor(uintptr_t,uint64_t,unsigned,unsigned,unsigned) {
+    return 0;       // no diagnostic scanout anchor without the boot-progress archive
+}
 static IORegistryEntry *unitScaleChosen;
 static bool unitScaleAdded,unitRotationAdded;
 static void finishUnitScalePolicy(bool keep) {
@@ -107,9 +113,12 @@ volatile int native_legacy_client_pid,native_legacy_client_status=-1;
 volatile uint64_t native_legacy_client_task,native_legacy_client_object;
 char native_legacy_client_class[64];
 extern kern_return_t OSKextLoadKextWithIdentifier(const char *);
-extern int boot_progress_prepare_scanout(void) __attribute__((weak_import));
-extern void boot_progress_cancel_scanout(void) __attribute__((weak_import));
-extern void boot_progress_stage(const char *) __attribute__((weak_import));
+__attribute__((weak)) int boot_progress_prepare_scanout(void);
+__attribute__((weak)) void boot_progress_cancel_scanout(void);
+__attribute__((weak)) void boot_progress_stage(const char *);
+__attribute__((weak)) int boot_progress_prepare_scanout(void) { return 1; }
+__attribute__((weak)) void boot_progress_cancel_scanout(void) {}
+__attribute__((weak)) void boot_progress_stage(const char *message) { (void) message; }
 volatile uint32_t native_legacy_prepare_calls,native_legacy_prepare_reason,native_legacy_prepare_attempts;
 volatile uint32_t native_legacy_prepare_failures,native_legacy_prepare_retried,native_legacy_prepare_max_attempts;
 volatile uint64_t native_legacy_prepare_wait_us;
