@@ -37,12 +37,12 @@ windows = [
 [kernel]
 defconfig = "ruyi_defconfig"
 # build-arm-driver.py exists only in device repositories, not in UniXNU/scripts.
-# build-ruyi-display.py builds the real display driver: MiniIOMobileFramebuffer +
-# MiniIOSurface adapted from HackiOS (drivers/RuyiDisplay/), compiled with the kernel's
-# own compile record and written to build/native-legacy-display/libNativeLegacyDisplay.late.a,
-# which XNU_NATIVE_LEGACY_DISPLAY=1 force-loads.  native_legacy_display_late_probe() in
-# RuyiDisplayEntry.cpp publishes and starts the IOMobileFramebuffer service from
-# bsd_autoconf(), after IOKitBSDInit().
+# build-ruyi-display.py builds the official UniXNU GopFramebuffer display driver
+# (drivers/NativeMobileDisplay submodule: NativeLegacyDisplay + NativeGOPPresenter) with the
+# kernel's own compile record, plus drivers/RuyiDisplay/RuyiDisplayProbe.cpp (the machine
+# glue that publishes the display on the UEFI GOP framebuffer) and the original-family ABI
+# bindings, into build/native-legacy-display/libNativeLegacyDisplay.late.a, which
+# XNU_NATIVE_LEGACY_DISPLAY=1 force-loads.
 # NativeUfs is postponed to M3: it references boot-progress, verified-root and IOStorageFamily
 # symbols that only the full sheng feature stack links.
 archives = [
@@ -65,15 +65,6 @@ slide = "-0x1000000"
 # Leaving the initializer out defers AMFI to normal kext loading so the rest of bsd_init can run;
 # restore this line once a PMGR nub provider is built.
 #early_security_init = "com.apple.driver.AppleMobileFileIntegrity=0xfffffff005ab4ae0"
-# The display family is ours (drivers/RuyiDisplay): the prelink root set must not contain
-# any kext that registers IOMobileFramebuffer, IOSurface or IOSurfaceRootUserClient, or
-# OSMetaClass::finishRegistration() panics on the duplicate class when that kext loads
-# ("Kext com.apple.iokit.IOSurface class IOSurfaceRootUserClient is a duplicate!").
-# IOMobileGraphicsFamily and IOSurface are therefore out, and so are IOGPUFamily and
-# AppleM2ScalerCSCDriver: both list IOSurface in OSBundleLibraries, so keeping either one
-# in the root set pulls com.apple.iokit.IOSurface back into the prelinked image through
-# the dependency closure.  Nothing else in the remaining set depends on them (verified by
-# walking the closure of the prelink info metadata; see the ruyi display notes).
 roots = [
   "com.apple.AppleFSCompression.AppleFSCompressionTypeZlib",
   "com.apple.driver.AppleARMPlatform",
@@ -81,6 +72,7 @@ roots = [
   "com.apple.driver.AppleAudioClockLibs",
   "com.apple.driver.AppleEffaceableStorage",
   "com.apple.driver.AppleIISController",
+  "com.apple.driver.AppleM2ScalerCSCDriver",
   # AMFI's start panics with "AMFI: No PMGR?\n" (ConfigurationSettings.cpp:235) on this platform.
   # The fix is not a board config knob: the prelinked kernel is patched after the build by
   # patch-amfi-ruyi.py (ported from Axiang-dev/UniXNU-caihong), which renames AMFI's own lookup
@@ -95,10 +87,13 @@ roots = [
   "com.apple.iokit.IOAudio2Family",
   "com.apple.iokit.IOCECFamily",
   "com.apple.iokit.IOCryptoAcceleratorFamily",
+  "com.apple.iokit.IOGPUFamily",
   "com.apple.iokit.IOHDCPFamily",
+  "com.apple.iokit.IOMobileGraphicsFamily",
   "com.apple.iokit.IOReportFamily",
   "com.apple.iokit.IOSlowAdaptiveClockingFamily",
   "com.apple.iokit.IOStorageFamily",
+  "com.apple.iokit.IOSurface",
   "com.apple.kec.Libm",
   "com.apple.kec.corecrypto",
   "com.apple.kext.AppleMatch",
