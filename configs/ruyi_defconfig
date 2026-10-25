@@ -22,7 +22,7 @@ CONFIG_XNU_CRYPTO_BOOTSTRAP="prelinked"
 
 # Postponed to M3: NativeUfs references boot-progress, verified-root and IOStorageFamily
 # symbols that are only linked by the full sheng feature stack.
-CONFIG_XNU_NATIVE_UFS=n
+CONFIG_XNU_NATIVE_UFS=y
 
 # Not applicable to ruyi (kept explicit so a later merge does not inherit them silently).
 CONFIG_XNU_ARMVIRT_PLATFORM=n
