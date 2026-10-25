@@ -11,9 +11,10 @@ CONFIG_XNU_NATIVE_ARCH_TIMER=y
 CONFIG_XNU_TRUST_CACHE_RUNTIME=y
 
 # Makes build-xnu-4k-baseline.sh -force_load build/native-legacy-display/libNativeLegacyDisplay.late.a,
-# which scripts/build-ruyi-display.py produces from drivers/RuyiDisplay/. bsd_autoconf() calls
-# native_legacy_display_late_probe() after IOKitBSDInit(), which publishes and starts the
-# IOMobileFramebuffer/IOSurface services on the boot framebuffer.
+# which scripts/build-ruyi-display.py builds from the official UniXNU GopFramebuffer driver
+# (drivers/NativeMobileDisplay submodule) plus drivers/RuyiDisplay/RuyiDisplayProbe.cpp.
+# bsd_init() (offline-mobile-graphics-load=1) and bsd_autoconf() (native_legacy_display_late_probe)
+# register and start the display on the UEFI GOP frame buffer.
 CONFIG_XNU_NATIVE_LEGACY_DISPLAY=y
 
 # The kernel is prelinked against the original Apple kernelcache, so crypto comes from there.
