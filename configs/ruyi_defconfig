@@ -11,8 +11,9 @@ CONFIG_XNU_NATIVE_ARCH_TIMER=y
 CONFIG_XNU_TRUST_CACHE_RUNTIME=y
 
 # Makes build-xnu-4k-baseline.sh -force_load build/native-legacy-display/libNativeLegacyDisplay.late.a,
-# which scripts/build-ruyi-display-stubs.py produces. The stub answers "no legacy display", so the
-# boot stays on the DarwinBoot framebuffer.
+# which scripts/build-ruyi-display.py produces from drivers/RuyiDisplay/. bsd_autoconf() calls
+# native_legacy_display_late_probe() after IOKitBSDInit(), which publishes and starts the
+# IOMobileFramebuffer/IOSurface services on the boot framebuffer.
 CONFIG_XNU_NATIVE_LEGACY_DISPLAY=y
 
 # The kernel is prelinked against the original Apple kernelcache, so crypto comes from there.
