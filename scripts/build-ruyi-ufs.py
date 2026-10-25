@@ -31,11 +31,17 @@ of living in RAM.  It has two kinds of link inputs, handled here:
 
 The driver sources are compiled with the kernel's own compile records: C++ with
 iokit/DEVELOPMENT/IOPlatformExpert.cpo.json, the verified-root kit's C files
-with bsd/DEVELOPMENT/bsd_init.o.json.  NativeUfs's C++ static initialiser stays
-in __DATA,__mod_init_func: the class is a plain IOService subclass and must be
-registered at kernel C++ runtime init so the KernelConfigTables NativeUfs
-personalities (XNU_NATIVE_UFS=1) can match it.  (Only the display driver needed
-its initialisers deferred, because it subclasses a prelinked kext class.)
+with bsd/DEVELOPMENT/bsd_init.o.json.  NativeUfs's C++ static initialiser must
+NOT stay in __DATA,__mod_init_func: OSRuntimeInitializeCPP() runs that section
+from InitIOKit(), long before the prelinked IOStorageFamily kext (and the
+IOBlockStorageDevice metaclass NativeUfsBlock subclasses) has been initialized,
+and a kernel with that constructor linked in dies before its first console line.
+The object is therefore rewritten with llvm-objcopy: the section is removed and
+__GLOBAL__sub_I_NativeUfs.cpp is globalised.  The glue calls it explicitly,
+between OSMetaClass::preModLoad()/postModLoad(), only when the kernel startup
+hook saw the native-ufs-root/native-ufs-probe boot args and after it has loaded
+com.apple.iokit.IOStorageFamily; a boot without those args executes no UFS code
+at all.
 
 Outputs:
     build/native-ufs/libNativeUfs.a     (the path build-xnu-4k-baseline.sh force-loads)
@@ -169,6 +175,66 @@ def macho_symbols(raw):
     return image, symbols
 
 
+def llvm_tool(name):
+    found = shutil.which(name)
+    if found:
+        return found
+    for candidate in (pathlib.Path("/home/a/ios/tools/llvm/usr/bin") / name,
+                      pathlib.Path("/opt/homebrew/opt/llvm/bin") / name,
+                      pathlib.Path("/usr/local/opt/llvm/bin") / name):
+        if candidate.is_file():
+            return str(candidate)
+    fail(f"{name} is required (brew install llvm)")
+
+
+def globalize_symbol(path, symbol):
+    """Give the compiler-emitted static initialiser external linkage in the object.
+
+    llvm-objcopy's Mach-O support for --globalize-symbol differs between toolchains,
+    so the nlist entry is edited directly: only n_type's N_EXT bit changes, which the
+    linker reads when it resolves the glue's reference to the initialiser.
+    """
+    data = bytearray(path.read_bytes())
+    sys.path.insert(0, str(ROOT / "kits/NativePrelink"))
+    from native_prelink import macho
+    image = macho(bytes(data))
+    symbol_command = next(offset for command, offset, _ in image["commands"] if command == 2)
+    symbol_offset, symbol_count, string_offset, _ = struct.unpack_from("<4I", data, symbol_command + 8)
+    for index in range(symbol_count):
+        name_offset, kind = struct.unpack_from("<IB", data, symbol_offset + index * 16)
+        name_start = string_offset + name_offset
+        name = bytes(data[name_start:data.index(b"\0", name_start)]).decode()
+        if name != symbol:
+            continue
+        if kind & 0x0E != 0x0E:
+            raise SystemExit(f"{path.name}: {symbol} is not a defined section symbol")
+        struct.pack_into("<B", data, symbol_offset + index * 16 + 4, kind | 0x01)
+        path.write_bytes(bytes(data))
+        return
+    raise SystemExit(f"{path.name}: {symbol} disappeared from the symbol table")
+
+
+def deferred_object(raw):
+    """Move the C++ static initialiser out of __DATA,__mod_init_func and globalise it."""
+    _, symbols = macho_symbols(raw.read_bytes())
+    symbol = next((name for name, _, kind in symbols
+                   if name.startswith("__GLOBAL__sub_I_") and kind != 1), None)
+    if not symbol:
+        fail(f"{raw.name}: no C++ static initialiser found")
+    deferred = raw.with_name(raw.stem + ".deferred.o")
+    objcopy = llvm_tool("llvm-objcopy")
+    run([objcopy, "--remove-section=__DATA,__mod_init_func", raw, deferred])
+    if not deferred.is_file():
+        fail(f"llvm-objcopy did not produce {deferred}")
+    globalize_symbol(deferred, symbol)
+    _, after = macho_symbols(deferred.read_bytes())
+    kinds = {name: kind for name, _, kind in after}
+    if not kinds.get(symbol, 0) & 0x01:
+        fail(f"{deferred.name}: the static initialiser is not external after globalising")
+    print(f"ufs: deferred C++ static initialiser {symbol} (no kernel-init code in the archive)", flush=True)
+    return deferred, symbol
+
+
 def storage_bindings(objects):
     """The subset of the committed original-storage table this build actually imports."""
     document = json.loads(BINDINGS.read_text())
@@ -218,13 +284,15 @@ def archive(objects):
     print(f"ufs: {ARCHIVE.relative_to(ROOT)} ({ARCHIVE.stat().st_size} bytes)", flush=True)
 
 
-def report(bindings, sources):
+def report(bindings, sources, deferred_symbol):
     document = {
         "archive_sha256": sha256(ARCHIVE),
         "source_sha256": {str(path.relative_to(ROOT)): sha256(path) for path in sources},
         "note": "ruyi NativeUfs block driver from the UniXNU submodule; original IOStorageFamily dispatch "
                 "bound to the pinned prelink addresses; verified-root policy set empty (fail closed)",
         "original_storage_bindings_sha256": sha256(BINDINGS),
+        "deferred_initializer": deferred_symbol,
+        "kernel_init_code_in_archive": False,
         "original_family_text_sha256": STORAGE_FAMILY_TEXT_SHA256,
         "verified_root_policy_count": 0,
         "bindings": {name: hex(value) for name, value in sorted(bindings.items())},
@@ -250,7 +318,9 @@ def main():
 
     ufs_includes = [STORAGE_INCLUDE, DRIVER, GLUE, VERIFIED_ROOT / "include"]
     ufs_defines = ["-DNATIVE_VERIFIED_BLOCK=1", "-DNATIVE_VERIFIED_BLOCK_MULTI_POLICY=1", "-mgeneral-regs-only"]
-    driver = compile_source(cpp_record, DRIVER / "NativeUfs.cpp", OUT / "NativeUfs.o", ufs_includes, ufs_defines)
+    driver_raw = compile_source(cpp_record, DRIVER / "NativeUfs.cpp", OUT / "NativeUfs.raw.o",
+                                ufs_includes, ufs_defines)
+    driver, deferred_symbol = deferred_object(driver_raw)
 
     kit_sources = [VERIFIED_ROOT / "src/verified_root.c", VERIFIED_ROOT / "adapters/xnu_crypto.c"]
     kit_objects = [
@@ -268,7 +338,7 @@ def main():
     sources = [DRIVER / "NativeUfs.cpp", GLUE / "RuyiUfsGlue.cpp", GLUE / "VerifiedBlockPolicy.h",
                BINDINGS, *kit_sources, VERIFIED_ROOT / "include/verified_root.h"]
     sources += sorted(path for path in DRIVER.iterdir() if path.suffix in (".h",) and path.is_file())
-    report(bindings, sources)
+    report(bindings, sources, deferred_symbol)
     print("ufs: official NativeUfs archive ready for the kernel link", flush=True)
 
 
