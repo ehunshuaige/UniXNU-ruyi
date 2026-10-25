@@ -21,7 +21,8 @@ import zlib
 
 ROOT = Path(__file__).resolve().parents[1]
 
-DRAM_BASE = 0x80000000
+DRAM_BASE = 0x80000000   # overridable with --dram-base; this phone's
+                         # contiguous 9 GiB window starts at 0x8c0000000
 ARMIO_BASE = 0x17000000
 GIC_DIST = 0x17100000
 GIC_DIST_SIZE = 0x10000
@@ -66,6 +67,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path,
                         default=ROOT / 'build/ruyi/boot/kernel.macho.adt')
+    parser.add_argument('--dram-base', type=lambda v: int(v, 0), default=DRAM_BASE,
+                        help='physical base of the DRAM window (default 0x80000000)')
     parser.add_argument('--dram-size', type=lambda value: int(value, 0), required=True,
                         help='Actual observed DRAM size, e.g. 0x300000000')
     parser.add_argument('--owned-memory-size', type=lambda value: int(value, 0), default=None,
@@ -146,7 +149,7 @@ def main():
               if (args.data_ramdisk or args.packed_data_ramdisk) and not args.persistent_data else []),
             *([('darwinboot-memory-size', struct.pack('<Q', args.owned_memory_size))]
               if args.owned_memory_size else []),
-            ('dram-base', struct.pack('<Q', DRAM_BASE)),
+            ('dram-base', struct.pack('<Q', args.dram_base)),
             ('dram-size', struct.pack('<Q', args.dram_size)),
             ('crypto-hash-method', b'sha2-384\0'),
             *([('root-matching', ('<dict><key>IOProviderClass</key><string>IOMedia</string>'
