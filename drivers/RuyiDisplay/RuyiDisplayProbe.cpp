@@ -546,9 +546,8 @@ void native_legacy_display_probe(void) {
     IOLog("RuyiDisplay: early probe: display released (phase %u is not a display phase)\n",phase);
     native_legacy_display_checkpoint();
 }
-// The two counters the display driver adds up when it retires a GPU-copied swap
-// early (sheng-fb-gpu=1, not enabled here). The driver imports them; the probe owns them.
-volatile uint64_t native_legacy_early_retires,native_legacy_early_failures;
+// native_legacy_early_retires/native_legacy_early_failures (GPU hand-off retirement
+// counters) are defined by NativeLegacyDisplay.cpp itself in this driver release.
 void native_legacy_display_late_probe(void) {
     IOService *display=pendingLegacyDisplay;
     IOLog("RuyiDisplay: late probe: display=%p, phase-4 lifecycle after IOKitBSDInit\n",display);
